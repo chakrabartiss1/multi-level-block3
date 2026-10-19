@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multilevel AV Conduction Block Ladder Diagram</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --panel-bg: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #cbd5e1;
+            --ecg-line: #0f172a;
+            --grid-line: #fecdd3;
+            --grid-line-bold: #fda4af;
+            --impulse-line: #1e293b;
+            --block-bar: #dc2626;
+            --accent-blue: #2563eb;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-top: 0;
+            margin-bottom: 6px;
+            color: #0f172a;
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            color: #64748b;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            background: #f1f5f9;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label {
+            font-size: 0.825rem;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        select, input[type="range"] {
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: white;
+            font-size: 0.9rem;
+        }
+
+        .metrics-card {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 6px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+        }
+
+        .metric {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: #1e40af;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .metric-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1e3a8a;
+        }
+
+        .canvas-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: #fff1f2; /* ECG paper tint */
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Multilevel AV Conduction Block Simulator</h1>
+    <div class="subtitle">Atrial Flutter (CL = 200 ms / 300 bpm) with Dual Level AV Node Wenckebach Conduction</div>
+
+    <div class="controls">
+        <div class="control-group">
+            <label for="ratio1">Upper AV Node (AVN-U) Block</label>
+            <select id="ratio1">
+                <option value="4:3" selected>4:3 Block (Conducted 3/4)</option>
+                <option value="3:2">3:2 Block (Conducted 2/3)</option>
+                <option value="5:4">5:4 Block (Conducted 4/5)</option>
+                <option value="2:1">2:1 Block (Conducted 1/2)</option>
+                <option value="1:1">1:1 Conduction (No Block)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label for="ratio2">Lower AV Node (AVN-L) Block</label>
+            <select id="ratio2">
+                <option value="4:3" selected>4:3 Block (Conducted 3/4)</option>
+                <option value="3:2">3:2 Block (Conducted 2/3)</option>
+                <option value="5:4">5:4 Block (Conducted 4/5)</option>
+                <option value="2:1">2:1 Block (Conducted 1/2)</option>
+                <option value="1:1">1:1 Conduction (No Block)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label for="xCompression">X-Axis Scale (px per 200ms cycle)</label>
+            <input type="range" id="xCompression" min="15" max="60" value="28">
+        </div>
+
+        <div class="control-group">
+            <label for="wenckInc">Wenckebach Increment (ms)</label>
+            <input type="range" id="wenckInc" min="10" max="50" value="25">
+        </div>
+    </div>
+
+    <div class="metrics-card">
+        <div class="metric">
+            <span class="metric-label">Atrial Rate (f-f)</span>
+            <span class="metric-value" id="atrialRate">300 bpm (200 ms)</span>
+        </div>
+        <div class="metric">
+            <span class="metric-label">AVN-U Output Rate</span>
+            <span class="metric-value" id="avnURate">225 bpm</span>
+        </div>
+        <div class="metric">
+            <span class="metric-label">Ventricular Rate</span>
+            <span class="metric-value" id="ventRate">168.75 bpm</span>
+        </div>
+        <div class="metric">
+            <span class="metric-label">Overall Conduction Ratio</span>
+            <span class="metric-value" id="netRatio">16:9 (56.25%)</span>
+        </div>
+    </div>
+
+    <div class="canvas-wrapper">
+        <canvas id="ladderCanvas"></canvas>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('ladderCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Controls
+    const ratio1Select = document.getElementById('ratio1');
+    const ratio2Select = document.getElementById('ratio2');
+    const xCompressionSlider = document.getElementById('xCompression');
+    const wenckIncSlider = document.getElementById('wenckInc');
+
+    // Metric Elements
+    const avnURateEl = document.getElementById('avnURate');
+    const ventRateEl = document.getElementById('ventRate');
+    const netRatioEl = document.getElementById('netRatio');
+
+    const flutterCL = 200; // ms
+    const totalFlutterWaves = 36; // Number of flutter waves to display
+
+    function parseRatio(ratioStr) {
+        if (ratioStr === "1:1") return { N: 1, M: 1 };
+        const parts = ratioStr.split(':').map(Number);
+        return { N: parts[0], M: parts[1] };
+    }
+
+    function calculateSimData() {
+        const r1 = parseRatio(ratio1Select.value);
+        const r2 = parseRatio(ratio2Select.value);
+        const wenckInc = parseFloat(wenckIncSlider.value);
+
+        const baseAH = 60; // ms
+        const baseHV = 40; // ms
+
+        let atrialEvents = [];
+        for (let i = 0; i < totalFlutterWaves; i++) {
+            atrialEvents.push({ index: i, time: i * flutterCL });
+        }
+
+        // Upper AV Node (AVN-U) Conduction
+        let avnUEvents = [];
+        let uConductedCount = 0;
+
+        atrialEvents.forEach((aEvent) => {
+            const step = uConductedCount % r1.N;
+            if (step < r1.M) {
+                const delay = baseAH + (step * wenckInc);
+                const exitTime = aEvent.time + delay;
+                avnUEvents.push({
+                    aIndex: aEvent.index,
+                    entryTime: aEvent.time,
+                    exitTime: exitTime,
+                    delay: delay,
+                    blocked: false
+                });
+                uConductedCount++;
+            } else {
+                avnUEvents.push({
+                    aIndex: aEvent.index,
+                    entryTime: aEvent.time,
+                    exitTime: aEvent.time + baseAH + (step * wenckInc * 0.5),
+                    delay: 0,
+                    blocked: true
+                });
+                uConductedCount++;
+            }
+        });
+
+        // Lower AV Node (AVN-L) Conduction
+        let avnLEvents = [];
+        let lConductedCount = 0;
+
+        avnUEvents.forEach((uEvent) => {
+            if (uEvent.blocked) {
+                return; // Impulse never reached AVN-L
+            }
+
+            const step = lConductedCount % r2.N;
+            if (step < r2.M) {
+                const delay = baseHV + (step * wenckInc * 0.8);
+                const exitTime = uEvent.exitTime + delay;
+                avnLEvents.push({
+                    aIndex: uEvent.aIndex,
+                    entryTime: uEvent.exitTime,
+                    exitTime: exitTime,
+                    delay: delay,
+                    blocked: false
+                });
+                lConductedCount++;
+            } else {
+                avnLEvents.push({
+                    aIndex: uEvent.aIndex,
+                    entryTime: uEvent.exitTime,
+                    exitTime: uEvent.exitTime + baseHV + (step * wenckInc * 0.4),
+                    delay: 0,
+                    blocked: true
+                });
+                lConductedCount++;
+            }
+        });
+
+        // Update Text Metrics
+        const uRatioVal = r1.M / r1.N;
+        const lRatioVal = r2.M / r2.N;
+        const netRatioVal = uRatioVal * lRatioVal;
+
+        const uBpm = 300 * uRatioVal;
+        const vBpm = 300 * netRatioVal;
+
+        avnURateEl.textContent = `${uBpm.toFixed(1)} bpm`;
+        ventRateEl.textContent = `${vBpm.toFixed(2)} bpm`;
+        netRatioEl.textContent = `${(r1.N * r2.N)}:${(r1.M * r2.M)} (${(netRatioVal * 100).toFixed(2)}%)`;
+
+        return { atrialEvents, avnUEvents, avnLEvents };
+    }
+
+    function draw() {
+        const { atrialEvents, avnUEvents, avnLEvents } = calculateSimData();
+
+        const pxPerMs = parseFloat(xCompressionSlider.value) / flutterCL;
+        const totalWidth = Math.max(1200, totalFlutterWaves * flutterCL * pxPerMs + 100);
+        
+        canvas.width = totalWidth;
+        canvas.height = 480;
+
+        const width = canvas.width;
+        const height = canvas.height;
+
+        // Background & ECG Grid
+        ctx.fillStyle = '#fff1f2';
+        ctx.fillRect(0, 0, width, height);
+
+        const smallGrid = 10;
+        ctx.lineWidth = 0.5;
+        ctx.strokeStyle = '#fecdd3';
+        for (let x = 0; x < width; x += smallGrid) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+        }
+        for (let y = 0; y < height; y += smallGrid) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+            ctx.stroke();
+        }
+
+        // Layout Heights
+        const ecgTop = 20;
+        const ecgHeight = 110;
+        const ecgBaseline = ecgTop + 75;
+
+        const ladderTop = 160;
+        const rowHeight = 65;
+
+        const yA = ladderTop;
+        const yAVNU = ladderTop + rowHeight;
+        const yAVNL = ladderTop + rowHeight * 2;
+        const yV = ladderTop + rowHeight * 3;
+
+        // Draw Ladder Row Lines & Labels
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#64748b';
+        ctx.font = 'bold 13px sans-serif';
+        ctx.fillStyle = '#0f172a';
+
+        const rows = [
+            { name: 'A (Atria)', y: yA },
+            { name: 'AVN-U (Upper AV Node)', y: yAVNU },
+            { name: 'AVN-L (Lower AV Node)', y: yAVNL },
+            { name: 'V (Ventricle)', y: yV }
+        ];
+
+        rows.forEach(r => {
+            ctx.beginPath();
+            ctx.moveTo(80, r.y);
+            ctx.lineTo(width - 20, r.y);
+            ctx.stroke();
+            ctx.fillText(r.name, 10, r.y + 4);
+        });
+
+        // Map Ventricular Conducted Beats Times
+        const vBeatTimes = avnLEvents.filter(e => !e.blocked).map(e => e.exitTime);
+
+        // 1. Draw Unified Continuous ECG Trace (Flutter waves + Superimposed QRS)
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#0f172a'; // Single ECG ink color
+        ctx.beginPath();
+
+        const startX = 90;
+        for (let x = startX; x < width - 20; x += 1) {
+            const timeMs = (x - startX) / pxPerMs;
+
+            // Sawtooth Atrial Flutter Wave (CL = 200ms)
+            const cyclePhase = (timeMs % flutterCL) / flutterCL;
+            let ecgY = ecgBaseline - (cyclePhase * 18 - 9);
+
+            // Superimpose QRS complexes where impulses reach Ventricles
+            vBeatTimes.forEach(vTime => {
+                const dt = timeMs - vTime;
+                if (dt >= -10 && dt <= 40) {
+                    if (dt >= -10 && dt < -2) {
+                        ecgY -= (dt + 10) * 1.5; // Q wave
+                    } else if (dt >= -2 && dt < 12) {
+                        ecgY -= (12 - dt) * 5.5 - 45; // Sharp R wave
+                    } else if (dt >= 12 && dt < 22) {
+                        ecgY += (dt - 12) * 2; // S wave
+                    } else if (dt >= 22 && dt <= 40) {
+                        ecgY -= Math.sin((dt - 22) / 18 * Math.PI) * 8; // T wave
+                    }
+                }
+            });
+
+            if (x === startX) {
+                ctx.moveTo(x, ecgY);
+            } else {
+                ctx.lineTo(x, ecgY);
+            }
+        }
+        ctx.stroke();
+
+        // Label ECG Trace
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillStyle = '#0f172a';
+        ctx.fillText("Surface ECG (Continuous f-waves + Conducted QRS)", 90, ecgTop + 10);
+
+        // 2. Draw Ladder Diagram Impulse Lines
+        atrialEvents.forEach(aEvent => {
+            const xA = startX + aEvent.time * pxPerMs;
+
+            // Atrial Tick
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.moveTo(xA, yA - 8);
+            ctx.lineTo(xA, yA + 4);
+            ctx.stroke();
+
+            // Find corresponding AVN-U Event
+            const uEvent = avnUEvents.find(u => u.aIndex === aEvent.index);
+            if (uEvent) {
+                const xUExit = startX + uEvent.exitTime * pxPerMs;
+
+                ctx.beginPath();
+                ctx.moveTo(xA, yA);
+                ctx.lineTo(xUExit, yAVNU);
+
+                if (uEvent.blocked) {
+                    ctx.strokeStyle = '#dc2626';
+                    ctx.stroke();
+
+                    // Block Bar (T-bar)
+                    ctx.beginPath();
+                    ctx.moveTo(xUExit - 5, yAVNU);
+                    ctx.lineTo(xUExit + 5, yAVNU);
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                } else {
+                    ctx.strokeStyle = '#0f172a';
+                    ctx.stroke();
+
+                    // Find corresponding AVN-L Event
+                    const lEvent = avnLEvents.find(l => l.aIndex === aEvent.index);
+                    if (lEvent) {
+                        const xLExit = startX + lEvent.exitTime * pxPerMs;
+
+                        ctx.beginPath();
+                        ctx.moveTo(xUExit, yAVNU);
+                        ctx.lineTo(xLExit, yAVNL);
+
+                        if (lEvent.blocked) {
+                            ctx.strokeStyle = '#dc2626';
+                            ctx.stroke();
+
+                            // Block Bar (T-bar)
+                            ctx.beginPath();
+                            ctx.moveTo(xLExit - 5, yAVNL);
+                            ctx.lineTo(xLExit + 5, yAVNL);
+                            ctx.lineWidth = 3;
+                            ctx.stroke();
+                        } else {
+                            ctx.strokeStyle = '#0f172a';
+                            ctx.stroke();
+
+                            // Final Line to Ventricle
+                            ctx.beginPath();
+                            ctx.moveTo(xLExit, yAVNL);
+                            ctx.lineTo(xLExit, yV);
+                            ctx.stroke();
+
+                            // Ventricular Activation Point
+                            ctx.beginPath();
+                            ctx.arc(xLExit, yV, 3, 0, Math.PI * 2);
+                            ctx.fillStyle = '#0f172a';
+                            ctx.fill();
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Event Listeners
+    ratio1Select.addEventListener('change', draw);
+    ratio2Select.addEventListener('change', draw);
+    xCompressionSlider.addEventListener('input', draw);
+    wenckIncSlider.addEventListener('input', draw);
+
+    // Initial Render
+    draw();
+</script>
+</body>
+</html>
